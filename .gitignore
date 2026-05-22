@@ -1,0 +1,44 @@
+# Data (다운로드/훈련 결과)
+data/ratings_train.txt
+data/ratings_test.txt
+data/nsmc_lm_*.txt
+data/nsmc_sentiment_*.jsonl
+data/vocab_*.json
+data/*.jsonl
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# 환경
+.venv/
+venv/
+env/
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 체크포인트
+*.pt
+*.pth
+checkpoints/
+
+# 과제 안내문 (로컬/Notion 전용, repo에 미포함)
+notion/
+
+# 기타
+.DS_Store
+*.swp
+*~
