@@ -182,7 +182,27 @@ class BPETokenizer:
         - train/load에서 얻은 merge rule을 학습 순서대로 적용합니다.
         - add_bos_eos=True이면 앞뒤에 bos/eos ID를 붙입니다.
         """
-        raise NotImplementedError("BPETokenizer.encode를 구현하세요.")
+        token_ids = [BYTE_OFFSET + byte for byte in text.encode("utf-8")]
+
+        for pair in self.merges:
+            pair = tuple(pair)
+            new_id = self.token_to_id[pair]
+            merged_ids = []
+            idx = 0
+
+            while idx < len(token_ids):
+                if idx < len(token_ids) - 1 and (token_ids[idx], token_ids[idx + 1]) == pair:
+                    merged_ids.append(new_id)
+                    idx += 2
+                else:
+                    merged_ids.append(token_ids[idx])
+                    idx += 1
+            token_ids = merged_ids
+
+        if add_bos_eos:
+            token_ids = [self.get_bos_id()] + token_ids + [self.get_eos_id()]
+
+        return token_ids
 
     def decode(self, ids: list[int], skip_special: bool = True) -> str:
         """
@@ -192,4 +212,30 @@ class BPETokenizer:
         - merge token은 원본 byte token까지 재귀적으로 펼칩니다.
         - byte를 하나씩 decode하지 말고, 마지막에 `bytes(...).decode("utf-8")`를 한 번만 호출합니다.
         """
-        raise NotImplementedError("BPETokenizer.decode를 구현하세요.")
+        byte_values = []
+
+        def append_token_bytes(token_id):
+            token = self.id_to_token[token_id]
+
+            if isinstance(token, bytes):
+                byte_values.extend(token)
+                return
+
+            if isinstance(token, tuple):
+                left_id, right_id = token
+                append_token_bytes(left_id)
+                append_token_bytes(right_id)
+                return
+
+            if isinstance(token, str):
+                if skip_special:
+                    return
+                byte_values.extend(token.encode("utf-8"))
+                return
+
+            raise TypeError(f"Unsupported token type: {type(token)}")
+
+        for token_id in ids:
+            append_token_bytes(token_id)
+
+        return bytes(byte_values).decode("utf-8")
