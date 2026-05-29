@@ -54,7 +54,7 @@
 2. 브라우저에서 다음 주소를 엽니다. `USERNAME`, 저장소명, 브랜치명은 본인 환경에 맞게 바꿉니다. 브랜치가 `main`이면 URL에서 `master`를 `main`으로 바꿉니다.
 
 ```text
-https://colab.research.google.com/github/USERNAME/gpt-lab/blob/master/gpt-lab.ipynb
+https://colab.research.google.com/github/rlawngud0428/jungle_SW_AI_13_14_gpt_lab/blob/master/gpt-lab.ipynb
 ```
 
 3. 노트북의 **1. 환경설정** 코드 셀을 가장 먼저 실행합니다.
