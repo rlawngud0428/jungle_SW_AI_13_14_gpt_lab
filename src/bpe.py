@@ -79,7 +79,38 @@ class BPETokenizer:
         - 새 token ID를 만들고, 시퀀스의 해당 pair를 새 ID로 치환합니다.
         - `self.merges`, `self.id_to_token`, `self.token_to_id`를 갱신합니다.
         """
-        raise NotImplementedError("BPETokenizer.train을 구현하세요.")
+        self.id_to_token = {}
+        self.token_to_id = {}
+        self.merges = []
+        self._init_special_tokens()
+
+        token_ids = [BYTE_OFFSET + byte for byte in corpus.encode("utf-8")]
+
+        while len(self.id_to_token) < self.vocab_size and len(token_ids) >= 2:
+            pair_counts = {}
+            for left, right in zip(token_ids, token_ids[1:]):
+                pair = (left, right)
+                pair_counts[pair] = pair_counts.get(pair, 0) + 1
+
+            best_pair, best_count = max(pair_counts.items(), key=lambda item: item[1])
+            if best_count < 2:
+                break
+
+            new_id = len(self.id_to_token)
+            self.id_to_token[new_id] = best_pair
+            self.token_to_id[best_pair] = new_id
+            self.merges.append(best_pair)
+
+            merged_ids = []
+            idx = 0
+            while idx < len(token_ids):
+                if idx < len(token_ids) - 1 and (token_ids[idx], token_ids[idx + 1]) == best_pair:
+                    merged_ids.append(new_id)
+                    idx += 2
+                else:
+                    merged_ids.append(token_ids[idx])
+                    idx += 1
+            token_ids = merged_ids
 
     def save(self, path: str | Path):
         """
