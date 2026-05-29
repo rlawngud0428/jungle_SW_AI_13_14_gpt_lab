@@ -7,6 +7,7 @@ UTF-8 byte-level BPE 토크나이저 과제 템플릿.
 항상 `text.encode("utf-8")`로 byte ID 시퀀스를 만든 뒤 merge를 적용하세요.
 """
 
+import json
 from pathlib import Path
 
 
@@ -118,13 +119,59 @@ class BPETokenizer:
 
         bytes와 tuple은 JSON에 바로 저장할 수 없으므로 type 정보를 함께 저장하세요.
         """
-        raise NotImplementedError("BPETokenizer.save를 구현하세요.")
+        def serialize_token(token):
+            if isinstance(token, bytes):
+                return {"type": "bytes", "value": list(token)}
+            if isinstance(token, tuple):
+                return {"type": "merge", "value": list(token)}
+            if isinstance(token, str):
+                return {"type": "special_tokens", "value": token}
+            raise TypeError(f"Unsupported token type: {type(token)}")
+
+        data = {
+            "vocab_size": self.vocab_size,
+            "id_to_token": {
+                str(token_id): serialize_token(token)
+                for token_id, token in sorted(self.id_to_token.items())
+            },
+            "merges": [list(pair) for pair in self.merges],
+        }
+
+        path = Path(path)
+        with path.open("w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
     def load(self, path: str | Path):
         """
         TODO: save()로 저장한 JSON 파일을 읽어 vocabulary와 merge rule을 복원합니다.
         """
-        raise NotImplementedError("BPETokenizer.load를 구현하세요.")
+        def deserialize_token(token_data):
+            token_type = token_data["type"]
+            value = token_data["value"]
+
+            if token_type == "bytes":
+                return bytes(value)
+            if token_type == "merge":
+                return tuple(value)
+            if token_type in ("special", "special_tokens"):
+                return value
+            raise ValueError(f"Unsupported token type: {token_type}")
+
+        path = Path(path)
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        self.vocab_size = data["vocab_size"]
+        self.id_to_token = {}
+        self.token_to_id = {}
+
+        for token_id, token_data in data["id_to_token"].items():
+            token_id = int(token_id)
+            token = deserialize_token(token_data)
+            self.id_to_token[token_id] = token
+            self.token_to_id[token] = token_id
+
+        self.merges = [tuple(pair) for pair in data["merges"]]
 
     def encode(self, text: str, add_bos_eos: bool = False) -> list[int]:
         """
