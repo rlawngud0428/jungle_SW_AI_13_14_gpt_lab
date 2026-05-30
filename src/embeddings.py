@@ -43,17 +43,12 @@ class InputEmbedding(nn.Module):
             (batch_size, seq_len, emb_dim)
         """
         # raise NotImplementedError("InputEmbedding.forward를 구현하세요.")
-
-        # 잘못 생각해서 작성했던 코드
-        # total_embedding = self.token_embedding + self.position_embedding
-        # after_dropout = total_embedding * self.dropout
-        # batch_size, seq_len = x
-        # return (batch_size, seq_len, after_dropout)
-
         batch_size, seq_len = x.shape
-        token_embeddings = self.token_embedding(x)
-        positions = torch.arange(seq_len, device=x.device)
-        position_embeddings = self.position_embedding(positions)
 
-        total_embedding = token_embeddings + position_embeddings
-        return self.dropout(total_embedding)
+        token_embeds = self.token_embedding(x)
+
+        positions = torch.arange(seq_len, device=x.device)
+        pos_embeds = self.position_embedding(positions)
+
+        x = token_embeds + pos_embeds
+        return self.dropout(x)
