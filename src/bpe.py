@@ -48,6 +48,13 @@ class BPETokenizer:
             self.id_to_token[idx] = token
             self.token_to_id[token] = idx
 
+        for byte_value in range(NUM_BYTES):
+            token_id = BYTE_OFFSET + byte_value
+            token = bytes([byte_value])
+
+            self.id_to_token[token_id] = token
+            self.token_to_id[token] = token_id
+
     def get_pad_id(self):
         """padding 토큰 ID."""
         return SPECIAL_IDS[PAD_TOKEN]
@@ -149,6 +156,10 @@ class BPETokenizer:
                     "value": token,
                 }
 
+        path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
     def load(self, path: str | Path):
         """
         TODO: save()로 저장한 JSON 파일을 읽어 vocabulary와 merge rule을 복원합니다.
@@ -171,7 +182,8 @@ class BPETokenizer:
 
             self.id_to_token[token_id] = token
             self.token_to_id[token] = token_id
-            self.merges = [tuple(merge) for merge in data["merges"]]
+
+        self.merges = [tuple(merge) for merge in data["merges"]]
 
         return self
 
