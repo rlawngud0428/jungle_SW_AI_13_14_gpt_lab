@@ -48,7 +48,17 @@ class GPTDataset(Dataset):
             input_ids: (context_length,)
             target_ids: (context_length,)
         """
-        raise NotImplementedError("GPTDataset.__getitem__을 구현하세요.")
+        if idx < 0 or idx >= self._length:
+            raise IndexError("GPTDataset index out of range")
+
+        start = idx * self.stride
+        input_ids = self.token_ids[start : start + self.context_length]
+        target_ids = self.token_ids[start + 1 : start + self.context_length + 1]
+
+        return (
+            torch.tensor(input_ids, dtype=torch.long),
+            torch.tensor(target_ids, dtype=torch.long),
+        )
 
 
 def create_dataloader(
