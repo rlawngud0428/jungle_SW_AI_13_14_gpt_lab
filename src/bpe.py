@@ -8,6 +8,7 @@ UTF-8 byte-level BPE 토크나이저 과제 템플릿.
 """
 
 from pathlib import Path
+from collections import Counter
 
 
 PAD_TOKEN = "<pad>"
@@ -41,9 +42,21 @@ class BPETokenizer:
         """
         TODO:
         1. 특수 토큰 4개를 고정 ID 0~3에 등록합니다.
-        2. byte 0~255를 ID 4~259에 bytes([byte_value]) 형태로 등록합니다.
+        2. byte 0-255를 ID 4-259에 bytes([byte_value]) 형태로 등록합니다.
         """
-        raise NotImplementedError("_init_special_tokens를 구현하세요.")
+        # raise NotImplementedError("_init_special_tokens를 구현하세요.")
+
+        # 특수 토큰 4개를 고정 ID 0~3번에 등록
+        for i, token in enumerate(SPECIAL_TOKENS):
+            self.id_to_token[i] = token
+            self.token_to_id[token] = i
+
+        # byte 0~255를 id 4~259에 bytes([byte_value]) 형태로 등록
+        for byte in range(256):
+            token_id = byte + BYTE_OFFSET
+            token = bytes([byte])
+            self.id_to_token[token_id] = token
+            self.token_to_id[token] = token_id
 
     def get_pad_id(self):
         """padding 토큰 ID."""
@@ -71,7 +84,58 @@ class BPETokenizer:
         - 새 token ID를 만들고, 시퀀스의 해당 pair를 새 ID로 치환합니다.
         - `self.merges`, `self.id_to_token`, `self.token_to_id`를 갱신합니다.
         """
-        raise NotImplementedError("BPETokenizer.train을 구현하세요.")
+        # raise NotImplementedError("BPETokenizer.train을 구현하세요.")
+
+        # self.id_to_token, token_to_id, merges를 초기화 해주기
+        self._init_special_tokens()
+
+        # corpus.encode를 통해서 byte를 얻고, 거기에 처음 special token offset 더해서 지금 id 구하기
+        ids = [byte + BYTE_OFFSET for byte in corpus.encode("utf-8")]
+        
+        # 언제까지? 하나가 될 때까지? -> ai에게 물어보았다!
+        # while 일단 vocab가 다 차면 그만둬야함. 그리고 단어가 1개 남게되면 그만둬야함. 그리고 최빈수가 2 이상이여야 함. 그래야 vocab에 추가하는 의미가 있지
+        while ((len(self.id_to_token) < self.vocab_size) and (len(ids) > 1)):
+            # 일단 2개씩 묶어보자
+            temp_list = []
+            for i in range(len(ids)-1):
+                temp_list.append((ids[i], ids[i+1]))
+
+            # 가장 자주 나온 놈을 찾는다.            
+            # max함수 찾아볼것
+            counter = Counter(temp_list)
+            max_count = max(counter.values())
+            if (max_count <= 1):
+                break
+            
+            # 가장 많이 나온 페어들
+            most_common = [key for key, value in counter.items() if value == max_count]
+            # 새로 저장할 ids
+            new_ids = []
+            # 새로 추가할 페어에 대한 idx (id_to_token)
+            idx = len(self.id_to_token)
+
+            # ids를 돌면서 pair를 발견하면 new_ids에 저장 / 아니면 그냥 저장
+            i = 0
+            while i < len(ids):
+                if (i == len(ids)-1):
+                    new_ids.append(ids[i])
+                    break
+
+                temp = (ids[i], ids[i+1])
+                if temp == most_common[0]:
+                    new_ids.append(idx)
+                    i+=2
+                    continue
+                new_ids.append(ids[i])
+                i+=1
+
+            # 반복문 돌면서 pair를 다 찾아서 new_ids에 만들었으니
+            # merges, itt, tti에 등록하고, ids도 new_ids로 바꾸기
+            self.merges.append((most_common[0], idx))
+            self.id_to_token[idx] = most_common[0]
+            self.token_to_id[most_common[0]] = idx
+
+            ids = new_ids
 
     def save(self, path: str | Path):
         """
