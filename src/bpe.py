@@ -143,13 +143,71 @@ class BPETokenizer:
 
         bytes와 tuple은 JSON에 바로 저장할 수 없으므로 type 정보를 함께 저장하세요.
         """
-        raise NotImplementedError("BPETokenizer.save를 구현하세요.")
+        import json
+
+        def encode_value(value):
+            if isinstance(value, bytes):
+                return {"type": "bytes", "value": list(value)}
+            if isinstance(value, tuple):
+                return {"type": "tuple", "value": [encode_value(item) for item in value]}
+            if isinstance(value, list):
+                return {"type": "list", "value": [encode_value(item) for item in value]}
+            if isinstance(value, str):
+                return {"type": "str", "value": value}
+            if isinstance(value, int):
+                return {"type": "int", "value": value}
+            raise TypeError(f"저장할 수 없는 타입입니다: {type(value).__name__}")
+
+        data = {
+            "vocab_size": self.vocab_size,
+            "id_to_token": [
+                {"id": token_id, "token": encode_value(token)}
+                for token_id, token in self.id_to_token.items()
+            ],
+            "token_to_id": [
+                {"token": encode_value(token), "id": token_id}
+                for token, token_id in self.token_to_id.items()
+            ],
+            "merges": encode_value(self.merges),
+        }
+
+        with Path(path).open("w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
     def load(self, path: str | Path):
         """
         TODO: save()로 저장한 JSON 파일을 읽어 vocabulary와 merge rule을 복원합니다.
         """
-        raise NotImplementedError("BPETokenizer.load를 구현하세요.")
+        import json
+
+        def decode_value(value):
+            value_type = value["type"]
+            raw_value = value["value"]
+            if value_type == "bytes":
+                return bytes(raw_value)
+            if value_type == "tuple":
+                return tuple(decode_value(item) for item in raw_value)
+            if value_type == "list":
+                return [decode_value(item) for item in raw_value]
+            if value_type == "str":
+                return raw_value
+            if value_type == "int":
+                return raw_value
+            raise ValueError(f"알 수 없는 타입입니다: {value_type}")
+
+        with Path(path).open("r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        self.vocab_size = data["vocab_size"]
+        self.id_to_token = {
+            item["id"]: decode_value(item["token"])
+            for item in data["id_to_token"]
+        }
+        self.token_to_id = {
+            decode_value(item["token"]): item["id"]
+            for item in data["token_to_id"]
+        }
+        self.merges = decode_value(data["merges"])
 
     def encode(self, text: str, add_bos_eos: bool = False) -> list[int]:
         """
