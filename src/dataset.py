@@ -24,20 +24,15 @@ class GPTDataset(Dataset):
         self.context_length = context_length
         self.stride = stride if stride is not None else context_length
         # TODO: 만들 수 있는 학습 샘플 개수를 self._length에 저장하세요.
-        if self.context_length <= 0:
-            raise ValueError("context_length must be positive")
-        if self.stride <= 0:
-            raise ValueError("stride must be positive")
-
-        available_starts = len(self.token_ids) - self.context_length - 1
-        # self._length = 0 if available_starts < 0 else available_starts // self.stride + 1
-        if available_starts < 0:
+        # raise NotImplementedError("GPTDataset.__init__에서 self._length를 구현하세요.")
+        if len(self.token_ids) <= context_length:
             self._length = 0
         else:
-            self._length = available_starts // self.stride + 1
+            self._length = ((len(token_ids) - context_length - 1) // self.stride) + 1
 
     def __len__(self) -> int:
         """TODO: 전체 샘플 개수를 반환합니다."""
+        # raise NotImplementedError("GPTDataset.__len__을 구현하세요.")
         return self._length
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
@@ -48,9 +43,7 @@ class GPTDataset(Dataset):
             input_ids: (context_length,)
             target_ids: (context_length,)
         """
-        if idx < 0 or idx >= self._length:
-            raise IndexError("GPTDataset index out of range")
-
+        # raise NotImplementedError("GPTDataset.__getitem__을 구현하세요.")
         start = idx * self.stride
         input_ids = self.token_ids[start : start + self.context_length]
         target_ids = self.token_ids[start + 1 : start + self.context_length + 1]
@@ -71,7 +64,13 @@ def create_dataloader(
     num_workers: int = 0,
 ) -> DataLoader:
     """TODO: GPTDataset을 만들고 torch.utils.data.DataLoader로 감싸 반환합니다."""
-    dataset = GPTDataset(token_ids, context_length, stride=stride)
+    # raise NotImplementedError("create_dataloader를 구현하세요.")
+    dataset = GPTDataset(
+        token_ids=token_ids,
+        context_length=context_length,
+        stride=stride,
+    )
+
     return DataLoader(
         dataset,
         batch_size=batch_size,
