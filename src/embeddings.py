@@ -13,7 +13,7 @@ class InputEmbedding(nn.Module):
     - token embedding: nn.Embedding(vocab_size, emb_dim)
     - position embedding: nn.Embedding(context_length, emb_dim)
     - token embedding + position embedding
-    - dropout
+    - dropou
     """
 
     def __init__(
