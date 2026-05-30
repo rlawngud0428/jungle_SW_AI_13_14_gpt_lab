@@ -124,10 +124,10 @@ class BPETokenizer:
                 temp = (ids[i], ids[i+1])
                 if temp == most_common[0]:
                     new_ids.append(idx)
-                    i+=2
+                    i += 2
                     continue
                 new_ids.append(ids[i])
-                i+=1
+                i += 1
 
             # 반복문 돌면서 pair를 다 찾아서 new_ids에 만들었으니
             # merges, itt, tti에 등록하고, ids도 new_ids로 바꾸기
@@ -218,7 +218,44 @@ class BPETokenizer:
         - train/load에서 얻은 merge rule을 학습 순서대로 적용합니다.
         - add_bos_eos=True이면 앞뒤에 bos/eos ID를 붙입니다.
         """
-        raise NotImplementedError("BPETokenizer.encode를 구현하세요.")
+        # raise NotImplementedError("BPETokenizer.encode를 구현하세요.")
+        ids = [byte + BYTE_OFFSET for byte in text.encode("utf-8")]
+
+        merges = self.merges
+        for merge in merges:
+            pair, id = merge
+            new_ids = []
+            i = 0
+            while (i < len(ids)):
+                if (i == len(ids)-1):
+                    new_ids.append(ids[i])
+                    break
+                
+                temp = (ids[i], ids[i+1])
+                if (temp == pair):
+                    new_ids.append(id)
+                    i += 2
+                    continue
+
+                new_ids.append(ids[i])
+                i += 1
+
+            ids = new_ids
+        
+        if (add_bos_eos == True):
+            ids.insert(0, 2)
+            ids.append(3)
+        
+        return ids
+
+    def _extend(self, id):
+        if (id >= 260):
+            left, right = self.id_to_token[id]
+        else:
+            return [id - BYTE_OFFSET]
+        left = self._extend(self, left)
+        right = self._extend(self, right)
+        return left + right
 
     def decode(self, ids: list[int], skip_special: bool = True) -> str:
         """
@@ -228,4 +265,12 @@ class BPETokenizer:
         - merge token은 원본 byte token까지 재귀적으로 펼칩니다.
         - byte를 하나씩 decode하지 말고, 마지막에 `bytes(...).decode("utf-8")`를 한 번만 호출합니다.
         """
-        raise NotImplementedError("BPETokenizer.decode를 구현하세요.")
+        # raise NotImplementedError("BPETokenizer.decode를 구현하세요.")
+        new_ids = []
+
+        for id in ids:
+            if id <= 4:
+                continue
+            new_ids.extend(self._extend(id))
+
+        return bytes(new_ids).decode("utf-8")
