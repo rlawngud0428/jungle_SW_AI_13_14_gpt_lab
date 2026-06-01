@@ -23,7 +23,7 @@ class LayerNorm(nn.Module):
         self.eps = eps
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """TODO: 마지막 차원의 평균과 분산으로 정규화한 뒤 gamma/beta를 적용합니다."""
+        """마지막 차원의 평균과 분산으로 정규화한 뒤 gamma/beta를 적용합니다."""
         mean = x.mean(dim=-1, keepdim=True)
         var = x.var(dim=-1, keepdim=True, unbiased=False)
         x_norm = (x - mean) / torch.sqrt(var + self.eps)
@@ -34,7 +34,7 @@ class GELU(nn.Module):
     """GPT FeedForward에서 사용하는 GELU 활성화 함수."""
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """TODO: tanh 근사식 또는 torch 연산으로 GELU를 구현합니다."""
+        """tanh 근사식으로 GELU를 계산합니다."""
         return 0.5 * x * (
             1.0 + torch.tanh(0.7978845608028654 * (x + 0.044715 * x.pow(3)))
         )
@@ -53,7 +53,7 @@ class FeedForward(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """TODO: FeedForward 네트워크를 통과시킵니다."""
+        """FeedForward 네트워크를 통과시킵니다."""
         return self.net(x)
 
 
@@ -83,7 +83,7 @@ class TransformerBlock(nn.Module):
         self.dropout = nn.Dropout(drop_rate)
 
     def forward(self, x: torch.Tensor, causal_mask: bool = True) -> torch.Tensor:
-        """TODO: attention과 ffn을 residual connection으로 연결합니다."""
+        """attention과 ffn을 residual connection으로 연결합니다."""
         attn_out = self.attention(self.ln1(x), causal_mask=causal_mask)
         if isinstance(attn_out, tuple):
             attn_out = attn_out[0]
@@ -124,7 +124,7 @@ class GPTModel(nn.Module):
         targets: torch.Tensor | None = None,
     ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """
-        TODO: logits를 만들고, targets가 있으면 cross entropy loss도 함께 반환합니다.
+        logits를 만들고, targets가 있으면 cross entropy loss도 함께 반환합니다.
 
         Returns:
             targets가 None이면 logits
@@ -152,7 +152,7 @@ def generate_text_simple(
     max_new_tokens: int,
     context_size: int,
 ) -> torch.Tensor:
-    """TODO: greedy 방식으로 max_new_tokens만큼 다음 토큰을 이어 붙입니다."""
+    """greedy 방식으로 max_new_tokens만큼 다음 토큰을 이어 붙입니다."""
     was_training = model.training
     model.eval()
 

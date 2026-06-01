@@ -44,7 +44,7 @@ class MultiHeadAttention(nn.Module):
         return_attention_weights: bool = False,
     ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """
-        TODO: multi-head attention forward를 구현합니다.
+        multi-head attention forward를 수행합니다.
 
         Args:
             x: (batch_size, seq_len, d_model)
