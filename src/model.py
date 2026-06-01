@@ -34,7 +34,8 @@ class GELU(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """TODO: tanh 근사식 또는 torch 연산으로 GELU를 구현합니다."""
-        raise NotImplementedError("GELU.forward를 구현하세요.")
+        coeff = torch.sqrt(torch.tensor(2.0 / torch.pi, dtype=x.dtype, device=x.device))
+        return 0.5 * x * (1.0 + torch.tanh(coeff * (x + 0.044715 * x**3)))
 
 
 class FeedForward(nn.Module):
