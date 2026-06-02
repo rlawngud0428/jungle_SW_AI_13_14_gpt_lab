@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 """NSMC 감성 분류 미세 조정 과제 템플릿."""
 
+import csv
+import json
+import random
+import re
 from pathlib import Path
 
 import torch
@@ -11,6 +15,31 @@ try:
     from .model import GPTModel
 except ImportError:
     from model import GPTModel
+
+
+def _clean_text(text: str | None) -> str:
+    if text is None:
+        return ""
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _read_nsmc_tsv(path: str | Path) -> list[dict]:
+    rows: list[dict] = []
+    with open(path, "r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            text = _clean_text(row.get("document"))
+            label = row.get("label")
+            if not text or label not in {"0", "1"}:
+                continue
+            rows.append({"text": text, "label": int(label)})
+    return rows
+
+
+def _write_jsonl(path: str | Path, rows: list[dict]) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
 def make_sentiment_dataset(
@@ -26,7 +55,27 @@ def make_sentiment_dataset(
     반환 형식:
         [{"text": "리뷰", "label": 0 또는 1}, ...]
     """
-    raise NotImplementedError("make_sentiment_dataset을 구현하세요.")
+    train_rows = _read_nsmc_tsv(train_tsv_path)
+    test_rows = _read_nsmc_tsv(test_tsv_path) if test_tsv_path is not None else []
+
+    rng = random.Random(seed)
+    rng.shuffle(train_rows)
+
+    if train_rows:
+        val_size = max(1, int(len(train_rows) * val_ratio))
+        val_rows = train_rows[:val_size]
+        train_rows = train_rows[val_size:]
+    else:
+        val_rows = []
+
+    if output_dir is not None:
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        _write_jsonl(output_path / "nsmc_sentiment_train.jsonl", train_rows)
+        _write_jsonl(output_path / "nsmc_sentiment_val.jsonl", val_rows)
+        _write_jsonl(output_path / "nsmc_sentiment_test.jsonl", test_rows)
+
+    return train_rows, val_rows, test_rows
 
 
 class ReviewSentimentDataset(Dataset):
