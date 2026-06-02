@@ -158,4 +158,17 @@ def generate_text_simple(
     context_size: int,
 ) -> torch.Tensor:
     """TODO: greedy 방식으로 max_new_tokens만큼 다음 토큰을 이어 붙입니다."""
-    raise NotImplementedError("generate_text_simple을 구현하세요.")
+    was_training = model.training
+    model.eval()
+
+    with torch.no_grad():
+        for _ in range(max_new_tokens):
+            idx_cond = idx[:, -context_size:]
+            logits = model(idx_cond)
+            logits = logits[:, -1, :]
+            idx_next = torch.argmax(logits, dim=-1, keepdim=True)
+            idx = torch.cat((idx, idx_next), dim=1)
+
+    model.train(was_training)
+
+    return idx
