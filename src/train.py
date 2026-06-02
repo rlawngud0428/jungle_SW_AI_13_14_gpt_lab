@@ -63,7 +63,13 @@ def save_checkpoint(
     path: str,
 ) -> None:
     """TODO: model/optimizer 상태, epoch, global_step을 torch.save로 저장합니다."""
-    raise NotImplementedError("save_checkpoint를 구현하세요.")
+    checkpoint = {
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "epoch": epoch,
+        "global_step": global_step,
+    }
+    torch.save(checkpoint, path)
 
 
 def load_checkpoint(
@@ -73,7 +79,13 @@ def load_checkpoint(
     device: torch.device,
 ) -> tuple[int, int]:
     """TODO: torch.load로 checkpoint를 읽어 model/optimizer 상태를 복원합니다."""
-    raise NotImplementedError("load_checkpoint를 구현하세요.")
+    checkpoint = torch.load(path, map_location=device)
+    model.load_state_dict(checkpoint["model_state_dict"])
+
+    if optimizer is not None:
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+    return checkpoint["epoch"], checkpoint["global_step"]
 
 
 def generate(
