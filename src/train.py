@@ -98,7 +98,35 @@ def generate(
     eos_id: int | None = None,
 ) -> torch.Tensor:
     """TODO: temperature와 top-k 샘플링을 지원하는 생성 함수를 구현합니다."""
-    raise NotImplementedError("generate를 구현하세요.")
+    was_training = model.training
+    model.eval()
+
+    with torch.no_grad():
+        for _ in range(max_new_tokens):
+            idx_cond = idx[:, -context_size:]
+            logits = model(idx_cond)
+            logits = logits[:, -1, :]
+
+            if top_k is not None:
+                k = min(top_k, logits.size(-1))
+                topk_values, _ = torch.topk(logits, k)
+                min_topk_value = topk_values[:, -1, None]
+                logits = logits.masked_fill(logits < min_topk_value, float("-inf"))
+
+            if temperature <= 0:
+                idx_next = torch.argmax(logits, dim=-1, keepdim=True)
+            else:
+                probs = torch.softmax(logits / temperature, dim=-1)
+                idx_next = torch.multinomial(probs, num_samples=1)
+
+            idx = torch.cat((idx, idx_next), dim=1)
+
+            if eos_id is not None and (idx_next == eos_id).all():
+                break
+
+    model.train(was_training)
+
+    return idx
 
 
 def generate_and_print_sample(
