@@ -130,14 +130,37 @@ class GPTForSequenceClassification(nn.Module):
         gpt_model: GPTModel,
         num_labels: int = 2,
         drop_rate: float = 0.1,
+        pooling: str = "last_token",
+        pad_id: int | None = None,
     ):
         super().__init__()
+        if pooling not in {"last_token", "last_non_pad", "mean"}:
+            raise ValueError("pooling must be one of: last_token, last_non_pad, mean")
         self.gpt = gpt_model
         self.num_labels = num_labels
+        self.pooling = pooling
+        self.pad_id = pad_id
         # TODO: dropout과 classifier를 정의하세요. classifier 입력 차원은 gpt_model.config["emb_dim"]입니다.
         # raise NotImplementedError("GPTForSequenceClassification.__init__을 구현하세요.")
         self.dropout = nn.Dropout(drop_rate)
         self.classifier = nn.Linear(gpt_model.config["emb_dim"], num_labels)
+
+    def _pool_hidden_states(self, hidden_states: torch.Tensor, input_ids: torch.Tensor) -> torch.Tensor:
+        if self.pooling == "last_token" or self.pad_id is None:
+            return hidden_states[:, -1, :]
+
+        mask = input_ids.ne(self.pad_id)
+
+        if self.pooling == "last_non_pad":
+            lengths = mask.sum(dim=1).clamp(min=1)
+            last_indices = lengths - 1
+            batch_indices = torch.arange(hidden_states.size(0), device=hidden_states.device)
+            return hidden_states[batch_indices, last_indices, :]
+
+        mask = mask.unsqueeze(-1).to(hidden_states.dtype)
+        summed = (hidden_states * mask).sum(dim=1)
+        counts = mask.sum(dim=1).clamp(min=1.0)
+        return summed / counts
 
     def forward(
         self,
@@ -155,7 +178,7 @@ class GPTForSequenceClassification(nn.Module):
             x = block(x)
         x = self.gpt.norm(x)
 
-        pooled = x[:, -1, :]
+        pooled = self._pool_hidden_states(x, input_ids)
         logits = self.classifier(self.dropout(pooled))
 
         if labels is None:

@@ -37,6 +37,7 @@ htmlcov/
 *.pt
 *.pth
 checkpoints/
+experiments/
 
 # 과제 안내문 (로컬/Notion 전용, repo에 미포함)
 notion/

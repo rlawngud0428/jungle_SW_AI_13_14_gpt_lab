@@ -226,6 +226,96 @@ python download_data.py
 - class imbalance 확인
 - validation loss가 가장 낮은 checkpoint 선택
 
+### 7.4 실험 기록과 발표용 출력
+
+실험 결과를 비교할 때는 `scripts/`의 실행 스크립트를 사용합니다. 각 run은 하이퍼파라미터,
+epoch별 loss/accuracy, 소요 시간, 그래프, Markdown 요약을 `experiments/` 아래에 저장합니다.
+
+사전 학습 baseline:
+
+```bash
+.venv/bin/python scripts/run_pretrain_experiment.py \
+  --experiment-name pretrain_baseline \
+  --vocab-size 1000 \
+  --context-length 128 \
+  --emb-dim 128 \
+  --n-layers 2 \
+  --batch-size 16 \
+  --learning-rate 3e-4 \
+  --epochs 1
+```
+
+감성 분류 미세 조정 baseline:
+
+```bash
+.venv/bin/python scripts/run_sentiment_experiment.py \
+  --experiment-name sentiment_baseline \
+  --pretrain-run-dir experiments/pretrain/<pretrain_run_dir> \
+  --max-length 128 \
+  --batch-size 16 \
+  --learning-rate 3e-4 \
+  --drop-rate 0.1 \
+  --epochs 3
+```
+
+감성 분류 실험을 분류별로 순차 실행:
+
+```bash
+.venv/bin/python scripts/run_sentiment_sweep.py \
+  --output-dir experiments/sentiment_sweep \
+  --mode focused \
+  --epochs 3
+```
+
+`focused` 모드는 발표용 비교에 필요한 핵심 실험을 순서대로 실행합니다.
+
+| 분류 | 비교 내용 |
+| --- | --- |
+| baseline | 권장 범위 중심 기준 설정 |
+| learning rate | `1e-4`, `3e-4`, `5e-4` 비교 |
+| dropout | `0.0`, `0.1`, `0.2` 비교 |
+| sequence length | `context_length/max_length` 64와 128 비교 |
+| pooling | `last_non_pad`, `mean`, `last_token` 비교 |
+| freeze | 전체 finetune, backbone freeze, embedding freeze 비교 |
+| differential LR | backbone 낮은 LR + classifier 높은 LR |
+
+실행 전 계획만 확인하려면:
+
+```bash
+.venv/bin/python scripts/run_sentiment_sweep.py \
+  --output-dir experiments/sentiment_sweep \
+  --mode focused \
+  --dry-run
+```
+
+사전 학습 checkpoint 없이 감성 분류 루프만 빠르게 확인할 수도 있습니다.
+
+```bash
+.venv/bin/python scripts/run_sentiment_experiment.py \
+  --experiment-name sentiment_smoke \
+  --train-limit 1024 \
+  --val-limit 256 \
+  --test-limit 256 \
+  --epochs 2
+```
+
+생성되는 주요 파일:
+
+| 파일 | 용도 |
+| --- | --- |
+| `config.json` | 해당 실험의 모든 하이퍼파라미터 |
+| `metrics.jsonl`, `metrics.csv` | epoch별 metric과 시간 |
+| `summary.md` | 발표/보고서에 옮기기 쉬운 요약 |
+| `plots/*_loss.png`, `plots/*_accuracy.png` | loss/accuracy 그래프 |
+| `comparison.csv`, `comparison.md`, `comparison_val_acc.png` | 여러 실험 비교표와 그래프 |
+| `sweep_plan.md` | 실험 순서와 변경한 하이퍼파라미터 목록 |
+
+비교 파일만 다시 만들고 싶다면 다음 명령을 실행합니다.
+
+```bash
+.venv/bin/python scripts/compare_experiments.py experiments/sentiment
+```
+
 ---
 
 ## 8. 제출물

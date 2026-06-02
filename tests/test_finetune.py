@@ -111,6 +111,33 @@ class TestGPTForSequenceClassification:
             pytest.fail("GPTForSequenceClassification 미구현")
         assert logits.shape == (2, 2)
 
+    def test_sequence_classification_pooling_options(self):
+        """분류 모델이 pooling 옵션을 바꿔도 샘플별 num_labels logits를 반환하는지 확인한다."""
+        from model import GPTModel
+        from finetune import GPTForSequenceClassification
+
+        for pooling in ("last_token", "last_non_pad", "mean"):
+            backbone = GPTModel(GPT_CONFIG_TINY)
+            model = GPTForSequenceClassification(
+                backbone,
+                num_labels=2,
+                pooling=pooling,
+                pad_id=0,
+            )
+            input_ids = torch.randint(4, GPT_CONFIG_TINY["vocab_size"], (2, 8))
+            input_ids[0, -2:] = 0
+            logits = model(input_ids)
+            assert logits.shape == (2, 2)
+
+    def test_sequence_classification_rejects_unknown_pooling(self):
+        """지원하지 않는 pooling 이름은 명확히 거부한다."""
+        from model import GPTModel
+        from finetune import GPTForSequenceClassification
+
+        backbone = GPTModel(GPT_CONFIG_TINY)
+        with pytest.raises(ValueError):
+            GPTForSequenceClassification(backbone, pooling="unknown")
+
 
 class TestSentimentTrainEval:
     """훈련/평가 함수가 호출 가능한지 확인."""
