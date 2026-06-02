@@ -140,7 +140,27 @@ def generate_and_print_sample(
     top_k: int | None = 40,
 ) -> None:
     """TODO: start_context를 encode하고 generate 후 decode하여 출력합니다."""
-    raise NotImplementedError("generate_and_print_sample을 구현하세요.")
+    encoded = tokenizer.encode(start_context)
+    if not encoded:
+        if hasattr(tokenizer, "get_bos_id"):
+            encoded = [tokenizer.get_bos_id()]
+        else:
+            raise ValueError("start_context must encode to at least one token")
+
+    idx = torch.tensor(encoded, dtype=torch.long, device=device).unsqueeze(0)
+    eos_id = tokenizer.get_eos_id() if hasattr(tokenizer, "get_eos_id") else None
+
+    generated = generate(
+        model,
+        idx,
+        max_new_tokens=max_new_tokens,
+        context_size=context_size,
+        temperature=temperature,
+        top_k=top_k,
+        eos_id=eos_id,
+    )
+    decoded_text = tokenizer.decode(generated[0].tolist())
+    print(decoded_text)
 
 
 def train_model(
