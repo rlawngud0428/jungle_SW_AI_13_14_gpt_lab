@@ -244,6 +244,11 @@ class BPETokenizer:
                     "type": "bytes",
                     "value": list(token),
                 }
+            elif isinstance(token, tuple):
+                data["id_to_token"][str(token_id)] = {
+                    "type": "tuple",
+                    "value": list(token),
+                }
             else:
                 data["id_to_token"][str(token_id)] = {
                     "type": "str",
@@ -301,6 +306,8 @@ class BPETokenizer:
 
             if item["type"] == "bytes":
                 token = bytes(item["value"])
+            elif item["type"] == "tuple":
+                token = tuple(item["value"])
             else:
                 token = item["value"]
 
