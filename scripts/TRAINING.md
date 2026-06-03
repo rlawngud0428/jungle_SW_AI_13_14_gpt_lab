@@ -1,6 +1,6 @@
 # 학습 및 벤치마크 가이드
 
-이 프로젝트는 pretrained tokenizer나 pretrained model을 사용하지 않습니다. 학습 명령은 먼저 로컬 byte-level BPE tokenizer를 학습한 뒤, `data/nsmc_lm_train.txt`로 mini GPT 언어 모델을 학습합니다.
+이 프로젝트는 pretrained tokenizer나 pretrained model을 사용하지 않습니다. 기본 학습 명령은 먼저 로컬 byte-level BPE tokenizer를 학습한 뒤, `data/nsmc_lm_train.txt`로 mini GPT 언어 모델을 학습합니다. 단, `--tokenizer-path`를 주면 기존에 저장한 BPE tokenizer를 재사용할 수 있습니다.
 
 ## 1. 환경 활성화
 
@@ -78,7 +78,7 @@ python -m pytest tests/ -q
 `scripts/train_lm.py`를 실행하면 아래 순서로 실제 학습이 진행됩니다.
 
 1. `data/nsmc_lm_train.txt`와 `data/nsmc_lm_val.txt`를 읽습니다.
-2. train text로 byte-level BPE tokenizer를 새로 학습합니다.
+2. 기본값은 train text로 byte-level BPE tokenizer를 새로 학습합니다. `--tokenizer-path`를 주면 기존 tokenizer를 불러옵니다.
 3. tokenizer로 train/validation text를 token ID로 변환합니다.
 4. `context_length` 길이의 input과 다음 token target을 만드는 DataLoader를 구성합니다.
 5. GPTModel을 random initialization 상태로 만듭니다.
@@ -255,6 +255,53 @@ python scripts/train_lm.py --preset dev --run-name dev-seed-123 --seed 123
 - `--vocab-size`나 모델 구조를 바꾸면 이전 checkpoint와 호환되지 않을 수 있습니다.
 - `--context-length`, `--batch-size`, `--emb-dim`, `--n-layers`는 CUDA 메모리에 큰 영향을 줍니다.
 - 실험 결과는 `metrics.json`과 `benchmark.json`을 함께 보면서 비교하는 게 좋습니다.
+
+### 같은 BPE를 고정하고 모델 구조만 바꿔 학습하기
+
+기본적으로 `scripts/train_lm.py`는 실행할 때마다 train text로 BPE tokenizer를 새로 학습합니다. 이미 학습해 둔 tokenizer를 고정하고 모델 구조만 바꿔 보고 싶으면 `--tokenizer-path`를 사용합니다.
+
+이 흐름은 benchmark가 아니라 아키텍처 실험에 가깝습니다.
+
+```text
+benchmark_lm.py
+= 이미 학습된 run을 불러와 학습 없이 loss와 처리 속도만 측정
+
+train_lm.py + 고정 tokenizer
+= 같은 BPE vocabulary/merge rule을 쓰면서 모델 구조만 바꿔 새로 학습
+```
+
+예를 들어 `full-001`의 BPE tokenizer는 그대로 쓰고, 모델만 더 작게 학습하려면 아래처럼 실행합니다.
+
+```powershell
+python scripts/train_lm.py `
+  --preset full `
+  --run-name full-emb64-layer2 `
+  --tokenizer-path runs\full-001\tokenizer.json `
+  --emb-dim 64 `
+  --n-layers 2 `
+  --batch-size 16
+```
+
+`--tokenizer-path`를 지정하면 다음처럼 동작합니다.
+
+1. 기존 `tokenizer.json`을 `BPETokenizer.load()`로 불러옵니다.
+2. 모델의 `vocab_size`는 불러온 tokenizer의 `vocab_size`에 맞춥니다.
+3. 새 run 디렉터리에도 같은 tokenizer를 `tokenizer.json`으로 저장합니다.
+4. `config.json`에는 사용한 tokenizer source가 기록됩니다.
+
+주의할 점:
+
+- `--tokenizer-path`를 쓰면 BPE vocab과 merge rule은 고정되고, `--emb-dim`, `--n-layers`, `--n-heads`, `--context-length`, `--batch-size` 같은 모델/학습 설정만 바꿔 비교하기 좋습니다.
+- `--vocab-size`를 따로 주지 않으면 불러온 tokenizer의 vocab size를 자동으로 사용합니다.
+- `--vocab-size`를 명시했는데 tokenizer의 vocab size와 다르면 에러가 납니다. tokenizer와 모델 출력 차원이 달라지면 학습과 추론이 맞지 않기 때문입니다.
+- 기존 checkpoint weight는 모델 구조가 바뀌면 재사용할 수 없습니다. tokenizer만 재사용하고 모델은 새로 학습하는 흐름입니다.
+
+이렇게 만든 run은 학습이 끝난 뒤 기존 도구로 비교할 수 있습니다.
+
+```powershell
+python scripts/benchmark_lm.py --run-dir runs\full-emb64-layer2
+python scripts/infer_lm.py --run-dir runs\full-emb64-layer2 --prompt "이 영화는"
+```
 
 ## 6. 학습 프리셋
 
