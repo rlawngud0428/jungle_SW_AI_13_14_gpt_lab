@@ -406,3 +406,27 @@ full: checkpoint 품질을 신경 쓰는 학습
 ```powershell
 & 'C:\ProgramData\anaconda3\envs\gpt-lab\python.exe' scripts/benchmark_lm.py --run-dir runs\smoke-direct
 ```
+
+## 12. full-001로 글자 추론 보기
+
+학습된 `full-001` run을 사용해 입력 문장 다음에 올 후보 token과 이어쓰기 결과를 함께 볼 수 있습니다.
+
+```powershell
+& 'C:\ProgramData\anaconda3\envs\gpt-lab\python.exe' scripts/infer_lm.py --run-dir runs\full-001 --prompt "이 영화는"
+```
+
+출력의 `[Next token candidates]`는 현재 prompt 바로 다음에 올 가능성이 높은 token 후보와 확률입니다. byte-level BPE를 쓰기 때문에 후보가 항상 완성된 한 글자처럼 보이지는 않을 수 있습니다.
+
+이어쓰기 길이와 샘플링을 바꾸고 싶으면 다음 옵션을 조절합니다.
+
+```powershell
+& 'C:\ProgramData\anaconda3\envs\gpt-lab\python.exe' scripts/infer_lm.py `
+  --run-dir runs\full-001 `
+  --prompt "배우 연기가" `
+  --top-k 10 `
+  --max-new-tokens 80 `
+  --temperature 0.8 `
+  --sample-top-k 40
+```
+
+재현 가능한 greedy 결과만 보고 싶으면 `--temperature 0 --sample-top-k 0`을 사용합니다.
