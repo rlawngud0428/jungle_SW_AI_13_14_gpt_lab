@@ -398,8 +398,21 @@ def run_training(args: argparse.Namespace) -> dict:
         val_chars=preset.val_chars,
     )
 
-    tokenizer = BPETokenizer(vocab_size=preset.vocab_size)
-    tokenizer.train(train_text)
+    tokenizer_source = "trained"
+    if args.tokenizer_path is not None:
+        tokenizer = BPETokenizer(vocab_size=preset.vocab_size)
+        tokenizer.load(args.tokenizer_path)
+        tokenizer_source = str(args.tokenizer_path)
+        if args.vocab_size is not None and args.vocab_size != tokenizer.vocab_size:
+            raise ValueError(
+                "--vocab-size must match the loaded tokenizer vocab_size "
+                f"({tokenizer.vocab_size})."
+            )
+        if preset.vocab_size != tokenizer.vocab_size:
+            preset = replace(preset, vocab_size=tokenizer.vocab_size)
+    else:
+        tokenizer = BPETokenizer(vocab_size=preset.vocab_size)
+        tokenizer.train(train_text)
     tokenizer.save(run_dir / "tokenizer.json")
 
     train_ids = tokenizer.encode(train_text)
@@ -432,6 +445,10 @@ def run_training(args: argparse.Namespace) -> dict:
         "preset": args.preset,
         "model": model_config,
         "training": asdict(preset),
+        "tokenizer": {
+            "source": tokenizer_source,
+            "vocab_size": tokenizer.vocab_size,
+        },
         "progress_freq": progress_freq,
         "seed": args.seed,
     }
@@ -527,6 +544,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--device", default="auto", help="auto, cpu, cuda, or cuda:0")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--start-context", default="이 영화")
+    parser.add_argument(
+        "--tokenizer-path",
+        type=Path,
+        help="Load an existing BPE tokenizer JSON instead of training a new one.",
+    )
 
     parser.add_argument("--vocab-size", type=int)
     parser.add_argument("--context-length", type=int)
