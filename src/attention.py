@@ -81,8 +81,11 @@ class MultiHeadAttention(nn.Module):
 
         if (causal_mask):
             # 코잘 어텐션을 위한 (미래를 가리기위한) 마스크 생성
-            mask = torch.triu(torch.ones(seq_len, seq_len), diagonal= 1)
-            masked_score = score.masked_fill(mask.bool(), -torch.inf)
+            mask = torch.triu(
+                torch.ones(seq_len, seq_len, dtype=torch.bool, device=score.device),
+                diagonal=1,
+            )
+            masked_score = score.masked_fill(mask, -torch.inf)
             score = masked_score
         
         # attention_weight = torch.softmax(score, dim=seq_len)
