@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Sequence
 
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,11 +28,10 @@ from bpe import BPETokenizer
 from dataset import create_dataloader
 from model import GPTModel
 from train import (
-    calc_accuracy_loader,
+    calc_loss_batch,
     calc_loss_loader,
-    plot_training_curves,
+    generate_and_print_sample,
     save_checkpoint,
-    train_model,
 )
 from scripts.console import configure_utf8_stdio
 
@@ -206,6 +206,185 @@ def format_final_evaluation(metrics: dict) -> str:
     )
 
 
+def format_duration(seconds: float) -> str:
+    if seconds == float("inf"):
+        return "--:--:--"
+    seconds = max(0, int(seconds))
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def calc_accuracy_loader(
+    data_loader,
+    model: GPTModel,
+    device: torch.device,
+    num_batches: int | None = None,
+) -> float:
+    if len(data_loader) == 0:
+        return float("nan")
+
+    was_training = model.training
+    model.eval()
+    correct = 0
+    total = 0
+    batches_seen = 0
+    max_batches = len(data_loader) if num_batches is None else min(num_batches, len(data_loader))
+
+    with torch.no_grad():
+        for input_batch, target_batch in data_loader:
+            if batches_seen >= max_batches:
+                break
+            input_batch = input_batch.to(device)
+            target_batch = target_batch.to(device)
+            logits = model(input_batch)
+            predictions = torch.argmax(logits, dim=-1)
+            correct += (predictions == target_batch).sum().item()
+            total += target_batch.numel()
+            batches_seen += 1
+
+    if was_training:
+        model.train()
+
+    return correct / total if total > 0 else float("nan")
+
+
+def plot_training_curves(eval_history: list[dict], path: Path) -> None:
+    if not eval_history:
+        return
+
+    steps = [point["step"] for point in eval_history]
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    axes[0].plot(steps, [point["train_loss"] for point in eval_history], label="Train")
+    axes[0].plot(steps, [point["val_loss"] for point in eval_history], label="Val")
+    axes[0].set_xlabel("Step")
+    axes[0].set_ylabel("Loss")
+    axes[0].set_title("Loss")
+    axes[0].legend()
+
+    axes[1].plot(
+        steps,
+        [point["train_accuracy"] for point in eval_history],
+        label="Train",
+    )
+    axes[1].plot(
+        steps,
+        [point["val_accuracy"] for point in eval_history],
+        label="Val",
+    )
+    axes[1].set_xlabel("Step")
+    axes[1].set_ylabel("Accuracy")
+    axes[1].set_title("Next-token Accuracy")
+    axes[1].legend()
+
+    fig.tight_layout()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path)
+    plt.close(fig)
+
+
+def train_language_model(
+    model: GPTModel,
+    train_loader,
+    val_loader,
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+    num_epochs: int,
+    eval_freq: int,
+    eval_iter: int,
+    start_context: str,
+    tokenizer,
+    ckpt_freq: int | None = None,
+    progress_freq: int | None = None,
+    eval_history: list[dict] | None = None,
+) -> list[float]:
+    epoch_losses = []
+    global_step = 0
+    total_steps = len(train_loader) * num_epochs
+    start_time = time.perf_counter()
+    model.to(device)
+
+    if eval_history is None:
+        eval_history = []
+
+    for epoch in range(num_epochs):
+        model.train()
+        epoch_loss = 0.0
+        batches_seen = 0
+
+        for input_batch, target_batch in train_loader:
+            optimizer.zero_grad()
+            loss = calc_loss_batch(input_batch, target_batch, model, device)
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item()
+            batches_seen += 1
+            global_step += 1
+
+            if progress_freq is not None and progress_freq > 0:
+                if global_step % progress_freq == 0 or global_step == total_steps:
+                    elapsed = time.perf_counter() - start_time
+                    steps_per_sec = global_step / elapsed if elapsed > 0 else 0.0
+                    remaining_steps = max(0, total_steps - global_step)
+                    eta = (
+                        remaining_steps / steps_per_sec
+                        if steps_per_sec > 0
+                        else float("inf")
+                    )
+                    percent = (global_step / total_steps * 100) if total_steps else 100.0
+                    print(
+                        f"[Progress] step {global_step}/{total_steps} "
+                        f"({percent:.1f}%) | epoch {epoch + 1}/{num_epochs} | "
+                        f"elapsed {format_duration(elapsed)} | "
+                        f"eta {format_duration(eta)} | "
+                        f"{steps_per_sec:.2f} steps/s"
+                    )
+
+            if eval_freq > 0 and global_step % eval_freq == 0:
+                train_loss = calc_loss_loader(train_loader, model, device, eval_iter)
+                val_loss = calc_loss_loader(val_loader, model, device, eval_iter)
+                train_accuracy = calc_accuracy_loader(train_loader, model, device, eval_iter)
+                val_accuracy = calc_accuracy_loader(val_loader, model, device, eval_iter)
+                eval_history.append(
+                    {
+                        "step": global_step,
+                        "epoch": epoch + 1,
+                        "train_loss": train_loss,
+                        "val_loss": val_loss,
+                        "train_accuracy": train_accuracy,
+                        "val_accuracy": val_accuracy,
+                    }
+                )
+                print(
+                    f"Ep {epoch + 1} (step {global_step}): "
+                    f"train loss {train_loss:.3f}, val loss {val_loss:.3f}, "
+                    f"train acc {train_accuracy:.3f}, val acc {val_accuracy:.3f}"
+                )
+
+            if ckpt_freq is not None and ckpt_freq > 0 and global_step % ckpt_freq == 0:
+                save_checkpoint(
+                    model,
+                    optimizer,
+                    epoch=epoch + 1,
+                    global_step=global_step,
+                    path=f"checkpoint_step_{global_step}.pt",
+                )
+
+        avg_epoch_loss = epoch_loss / batches_seen if batches_seen > 0 else float("nan")
+        epoch_losses.append(avg_epoch_loss)
+        generate_and_print_sample(
+            model,
+            tokenizer,
+            device,
+            start_context=start_context,
+            context_size=model.config.get("context_length", 256),
+        )
+
+    return epoch_losses
+
+
 def run_training(args: argparse.Namespace) -> dict:
     preset = apply_overrides(args)
     set_seed(args.seed)
@@ -263,7 +442,7 @@ def run_training(args: argparse.Namespace) -> dict:
     eval_history = []
     try:
         os.chdir(run_dir)
-        epoch_losses = train_model(
+        epoch_losses = train_language_model(
             model=model,
             train_loader=train_loader,
             val_loader=val_loader,

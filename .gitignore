@@ -1,6 +1,7 @@
 # myself
 myself/
 docs/
+runs/
 
 # Data (다운로드/훈련 결과)
 data/ratings_train.txt
